@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Markdown Memos</title>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        /* === MATERIAL 3 EXPRESSIVE DARK THEME === */
+        :root {
+            --md-sys-color-background: #1A1C19;
+            --md-sys-color-on-background: #E2E3DD;
+            --md-sys-color-surface: #2A2C29; 
+            --md-sys-color-on-surface: #E2E3DD;
+            --md-sys-color-on-surface-variant: #C2C9BD; 
+            --md-sys-color-primary: #9CD67D; 
+            --md-sys-color-on-primary: #0C3900;
+            --md-sys-color-primary-container: #265108;
+            --md-sys-color-error: #FFB4AB; 
+            --md-sys-color-error-container: #93000A;
+            --md-sys-color-outline: #8C9388;
+            
+            /* Custom Note Colors */
+            --memo-color-red: #4A1515;
+            --memo-color-blue: #15304A;
+            --memo-color-green: #154A1C;
+            --memo-color-yellow: #4A4315;
+            --memo-color-purple: #3A154A;
+
+            --radius-large: 28px;
+            --radius-medium: 16px;
+            --spacing: 12px;
+        }
+
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+        body {
+            margin: 0;
+            font-family: system-ui, -apple-system, sans-serif;
+            background-color: var(--md-sys-color-background);
+            color: var(--md-sys-color-on-background);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        h1 { text-align: center; font-size: 24px; font-weight: 700; margin: 20px 0; }
+
+        #main-view { flex: 1; display: flex; flex-direction: column; overflow: hidden; padding: var(--spacing); }
+        
+#memo-grid {
+    flex: 1;
+    overflow-y: auto;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: var(--spacing);
+    align-content: start; 
+    padding-bottom: 120px; 
+}
+
+        /* List View Styles */
+        #memo-grid.list-view { 
+            display: flex; 
+            flex-direction: column; 
+        }
+        #memo-grid.list-view .memo-card { 
+            height: auto; 
+            min-height: 110px; 
+            flex-shrink: 0; 
+        }
+
+        .memo-card {
+            background-color: var(--md-sys-color-surface);
+            border-radius: var(--radius-medium);
+            padding: var(--spacing);
+            display: flex;
+            flex-direction: column;
+            height: 180px;
+            cursor: pointer;
+            transition: transform 0.2s, background-color 0.3s;
+            user-select: none;
+        }
+        .memo-card:active { transform: scale(0.98); }
+
+        .card-title { font-weight: bold; font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 4px; }
+        .card-date { font-size: 11px; color: var(--md-sys-color-on-surface-variant); margin-bottom: 8px; }
+.card-preview { 
+    font-size: 12px; 
+    color: var(--md-sys-color-on-surface-variant); 
+    flex: 1; 
+    overflow: hidden; 
+    display: -webkit-box; 
+    -webkit-line-clamp: 4; 
+    -webkit-box-orient: vertical; 
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+        
+        /* Tags */
+        .tags-container { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; height: 22px; overflow: hidden; align-items: center;}
+        .tag-chip { 
+            background-color: rgba(255, 255, 255, 0.1); 
+            color: var(--md-sys-color-primary); 
+            font-size: 10px; 
+            padding: 0 8px; 
+            height: 20px;
+            border-radius: 10px; 
+            white-space: nowrap; 
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            line-height: 1;
+            cursor: pointer;
+        }
+
+        .card-actions { display: flex; justify-content: flex-end; gap: 4px; margin-top: auto; padding-top: 4px;}
+        
+        .icon-btn { 
+            background: none; 
+            border: none; 
+            font-size: 18px; 
+            color: var(--md-sys-color-primary); 
+            cursor: pointer; 
+            padding: 8px; 
+            min-width: 36px; 
+            min-height: 36px; 
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+        }
+
+        /* === BOTTOM BAR === */
+        #bottom-bar {
+            position: fixed;
+            bottom: var(--spacing);
+            left: var(--spacing);
+            right: var(--spacing);
+            display: flex;
+            gap: 8px;
+            height: 56px;
+        }
+
+        .btn { border: none; border-radius: 100px; font-weight: 600; font-size: 15px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+        .btn-primary { background-color: var(--md-sys-color-primary-container); color: var(--md-sys-color-primary); flex: 1;}
+        .btn-icon { background-color: var(--md-sys-color-primary-container); color: var(--md-sys-color-primary); flex: 0 0 56px; font-size: 20px;}
+
+        /* === MODALS === */
+        .modal {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: var(--md-sys-color-background);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            transform: translateY(100%);
+            transition: transform 0.3s cubic-bezier(0.2, 0, 0, 1);
+            padding: var(--spacing);
+        }
+        .modal.active { transform: translateY(0); }
+        
+        .modal-content {
+            background-color: var(--md-sys-color-surface);
+            border-radius: var(--radius-large);
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+            overflow: hidden;
+            border: 1px solid var(--md-sys-color-outline);
+            transition: background-color 0.3s;
+        }
+
+        .modal-header { font-size: 22px; font-weight: bold; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center;}
+        
+        #viewer-body { flex: 1; overflow-y: auto; color: var(--md-sys-color-on-surface-variant); line-height: 1.5; user-select: text; }
+        #viewer-body a { color: #2196F3; text-decoration: underline; }
+        #viewer-body .wiki-link { color: var(--md-sys-color-primary); cursor: pointer; font-weight: 600; }
+        #viewer-body blockquote { margin: 0 0 16px 0; padding: 4px 0 4px 20px; border-left: 5px solid #9C27B0; background-color: rgba(156, 39, 176, 0.1); border-radius: 0 8px 8px 0; }
+        #viewer-body table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+        #viewer-body th, #viewer-body td { border: 1px solid var(--md-sys-color-outline); padding: 8px; }
+        #viewer-body mark { background-color: rgba(156, 214, 125, 0.3); color: var(--md-sys-color-on-surface); border-radius: 4px; padding: 0 4px; }
+        
+        #viewer-body input[type="checkbox"] { transform: scale(1.3); margin-right: 8px; cursor: pointer; accent-color: var(--md-sys-color-primary); }
+
+        .editor-input { background: transparent; border: none; color: var(--md-sys-color-on-background); font-family: inherit; outline: none; width: 100%; }
+        #edit-title { font-size: 20px; font-weight: bold; margin-bottom: 12px; border-bottom: 1px solid var(--md-sys-color-outline); padding-bottom: 8px;}
+        #edit-content { flex: 1; resize: none; font-size: 16px; line-height: 1.5; margin-bottom: 16px; }
+
+        /* Color Picker */
+        .color-picker-container { display: flex; gap: 12px; margin-bottom: 16px; justify-content: center; }
+        .color-dot { width: 28px; height: 28px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; transition: transform 0.2s; }
+        .color-dot.selected { border-color: var(--md-sys-color-primary); transform: scale(1.1); }
+
+        #search-input { font-size: 18px; padding: 12px; margin-bottom: 16px; border-bottom: 2px solid var(--md-sys-color-primary); border-radius: 8px 8px 0 0; background: rgba(255,255,255,0.05); }
+        #search-results { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+        .search-item { padding: 12px; background: var(--md-sys-color-background); border-radius: var(--radius-medium); cursor: pointer; color: var(--md-sys-color-primary); }
+
+        .modal-actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 12px; }
+        .text-btn { background: none; border: none; font-weight: bold; font-size: 14px; text-transform: uppercase; cursor: pointer; padding: 8px 16px; }
+        
+        .settings-btn { background: var(--md-sys-color-primary-container); color: var(--md-sys-color-primary); border: none; padding: 16px; border-radius: var(--radius-medium); font-size: 16px; font-weight: bold; margin-bottom: 12px; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+    <div id="main-view">
+        <h1>Markdown Memos</h1>
+        <div id="memo-grid"></div>
+        <div id="bottom-bar">
+            <button class="btn btn-icon" onclick="openSettings()">&#9881;&#65039;</button>
+            <button class="btn btn-icon" id="view-toggle-btn" onclick="toggleView()">&#9776;&#65039;</button>
+            <button class="btn btn-icon" onclick="openSearch()">&#128269;</button>
+            <button class="btn btn-primary" onclick="openEditor(null)">+ New Memo</button>
+        </div>
+    </div>
+
+    <div id="viewer-modal" class="modal">
+        <div class="modal-content" id="viewer-content-box">
+            <div class="modal-header" id="viewer-title">Title</div>
+            <div id="viewer-body"></div>
+            <div class="modal-actions">
+                <button class="text-btn" style="color: var(--md-sys-color-primary);" onclick="editCurrentViewer()">&#9999;&#65039; EDIT</button>
+                <button class="text-btn" style="color: var(--md-sys-color-error);" onclick="closeModal('viewer-modal')">CLOSE</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="editor-modal" class="modal">
+        <div class="modal-content" id="editor-content-box">
+            <div class="modal-header">Edit Memo</div>
+            
+            <div class="color-picker-container" id="color-picker">
+                </div>
+
+            <input type="text" id="edit-title" class="editor-input" placeholder="Memo Title...">
+            <textarea id="edit-content" class="editor-input" placeholder="Write your note here... Use #tags or [[Links]]."></textarea>
+            
+            <div class="modal-actions">
+                <button class="text-btn" style="color: var(--md-sys-color-error);" onclick="closeModal('editor-modal')">CANCEL</button>
+                <button class="text-btn" style="color: var(--md-sys-color-primary);" onclick="saveMemo()">SAVE</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="search-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">Search Memos</div>
+            <input type="text" id="search-input" class="editor-input" placeholder="Search text or #tags..." onkeyup="performSearch()">
+            <div id="search-results"></div>
+            <div class="modal-actions">
+                <button class="text-btn" style="color: var(--md-sys-color-error);" onclick="closeModal('search-modal')">CLOSE</button>
+            </div>
+        </div>
+    </div>
+    
+    <div id="settings-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">Settings & Data</div>
+            <div style="flex: 1; display: flex; flex-direction: column; justify-content: center;">
+                <p style="color: var(--md-sys-color-on-surface-variant); text-align: center; margin-bottom: 24px;">
+                    Use these options to backup your notes or transfer them to another device. Colors and Tags are saved automatically!
+                </p>
+                <button class="settings-btn" onclick="exportData()">&#128228; Export Backup (JSON)</button>
+                <button class="settings-btn" onclick="document.getElementById('import-file').click()">&#128229; Import Backup</button>
+                <input type="file" id="import-file" style="display: none;" accept=".json" onchange="importData(event)">
+            </div>
+            <div class="modal-actions">
+                <button class="text-btn" style="color: var(--md-sys-color-error);" onclick="closeModal('settings-modal')">CLOSE</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="reorder-modal" class="modal" style="background: rgba(0,0,0,0.7);">
+        <div class="modal-content" style="flex: none; margin: auto; height: auto;">
+            <div class="modal-header" style="justify-content: center;">Reorder Memo</div>
+            <button class="text-btn" style="color: var(--md-sys-color-primary); margin-bottom: 12px;" onclick="moveMemo(0)">&#9195; Move to Top</button>
+            <button class="text-btn" style="color: var(--md-sys-color-primary); margin-bottom: 12px;" onclick="moveMemo(-1)">&#8679; Move Up</button>
+            <button class="text-btn" style="color: var(--md-sys-color-primary); margin-bottom: 12px;" onclick="moveMemo(1)">&#8681; Move Down</button>
+            <button class="text-btn" style="color: var(--md-sys-color-primary); margin-bottom: 12px;" onclick="moveMemo(999)">&#9196; Move to Bottom</button>
+            <button class="text-btn" style="color: var(--md-sys-color-error);" onclick="closeModal('reorder-modal')">&#10006;&#65039; Cancel</button>
+        </div>
+    </div>
+
+    <div id="delete-modal" class="modal" style="background: rgba(0,0,0,0.7);">
+        <div class="modal-content" style="flex: none; margin: auto; height: auto;">
+            <div class="modal-header" style="justify-content: center; color: var(--md-sys-color-error);">Delete Memo?</div>
+            <p style="text-align: center; color: var(--md-sys-color-on-surface-variant); margin-bottom: 24px;">This action cannot be undone.</p>
+            <div class="modal-actions" style="justify-content: space-around;">
+                <button class="text-btn" style="color: var(--md-sys-color-on-surface-variant);" onclick="closeModal('delete-modal')">CANCEL</button>
+                <button class="text-btn" style="color: var(--md-sys-color-error);" onclick="confirmDelete()">DELETE</button>
+            </div>
+        </div>
+    </div>
+
+<script>
+    let memos = JSON.parse(localStorage.getItem('md_memos')) || [];
+    let currentEditId = null;
+    let currentViewerId = null;
+    let currentReorderIndex = null;
+    let memoToDelete = null;
+    let longPressTimer;
+    let isListView = localStorage.getItem('md_list_view') === 'true';
+    let currentEditColor = '';
+
+    const colors = [
+        { name: 'Default', hex: '' },
+        { name: 'Red', hex: 'var(--memo-color-red)' },
+        { name: 'Blue', hex: 'var(--memo-color-blue)' },
+        { name: 'Green', hex: 'var(--memo-color-green)' },
+        { name: 'Yellow', hex: 'var(--memo-color-yellow)' },
+        { name: 'Purple', hex: 'var(--memo-color-purple)' }
+    ];
+
+    marked.setOptions({ gfm: true, breaks: true });
+
+    // Initialize View
+    if(isListView) document.getElementById('memo-grid').classList.add('list-view');
+
+    function saveToStorage() {
+        localStorage.setItem('md_memos', JSON.stringify(memos));
+        renderGrid();
+    }
+
+    function toggleView() {
+        isListView = !isListView;
+        localStorage.setItem('md_list_view', isListView);
+        const grid = document.getElementById('memo-grid');
+        grid.classList.toggle('list-view');
+    }
+
+    function extractTags(text) {
+        const regex = /#([a-zA-Z0-9_-]+)/g;
+        const tags = new Set();
+        let match;
+        while ((match = regex.exec(text)) !== null) {
+            tags.add(match[1]);
+        }
+        return Array.from(tags);
+    }
+
+    function searchForTag(tag) {
+        document.getElementById('search-input').value = tag;
+        document.getElementById('search-modal').classList.add('active');
+        performSearch();
+    }
+
+    function renderGrid() {
+        const grid = document.getElementById('memo-grid');
+        grid.innerHTML = '';
+
+        memos.forEach((memo, index) => {
+            const lines = memo.content.split('\n').filter(l => l.trim() !== '').slice(0, 4);
+            const previewText = lines.length > 0 ? lines.join('\n') : "No content...";
+            const dateStr = new Date(memo.lastModified).toLocaleDateString('en-US', { month: 'short', day: '2-digit' });
+            const tags = extractTags(memo.content);
+            
+            const tagsHtml = tags.map(t => 
+                `<div class="tag-chip" onclick="searchForTag('#${escapeHtml(t)}'); event.stopPropagation();">#${escapeHtml(t)}</div>`
+            ).join('');
+
+            const card = document.createElement('div');
+            card.className = 'memo-card';
+            if (memo.color) card.style.backgroundColor = memo.color;
+            
+            card.addEventListener('touchstart', (e) => {
+                if(e.target.closest('.icon-btn') || e.target.closest('.tag-chip')) return; 
+                longPressTimer = setTimeout(() => openReorder(index), 600);
+            });
+            card.addEventListener('touchend', () => clearTimeout(longPressTimer));
+            card.addEventListener('touchmove', () => clearTimeout(longPressTimer));
+            card.addEventListener('click', (e) => {
+                if(!e.target.closest('.icon-btn') && !e.target.closest('.tag-chip')) openViewer(memo.id);
+            });
+
+            card.innerHTML = `
+                <div class="card-title">${memo.title}</div>
+                <div class="card-date">${dateStr}</div>
+                <div class="card-preview">${escapeHtml(previewText)}</div>
+                ${tags.length > 0 ? `<div class="tags-container">${tagsHtml}</div>` : ''}
+                <div class="card-actions">
+                    <button class="icon-btn" onclick="openEditor('${memo.id}'); event.stopPropagation();">&#9999;&#65039;</button>
+                    <button class="icon-btn" onclick="deleteMemo('${memo.id}'); event.stopPropagation();">&#128465;&#65039;</button>
+                </div>
+            `;
+            grid.appendChild(card);
+        });
+    }
+
+    // --- VIEW & EDIT ---
+    function openViewer(id) {
+        currentViewerId = id;
+        const memo = memos.find(m => m.id === id);
+        if(!memo) return;
+
+        document.getElementById('viewer-title').innerText = memo.title;
+        
+        const viewerBox = document.getElementById('viewer-content-box');
+        viewerBox.style.backgroundColor = memo.color || 'var(--md-sys-color-surface)';
+
+        let rawContent = memo.content;
+        rawContent = rawContent.replace(/\[\[(.*?)\]\]/g, (match, target) => {
+            return `<span class="wiki-link" onclick="handleWikiLink('${target}')">${target}</span>`;
+        });
+        
+        // NEW: Add support for ==highlight== syntax
+        rawContent = rawContent.replace(/==(.*?)==/g, '<mark>$1</mark>');
+
+        const viewerBody = document.getElementById('viewer-body');
+        viewerBody.innerHTML = marked.parse(rawContent);
+        
+        const checkboxes = viewerBody.querySelectorAll('input[type="checkbox"]');
+        checkboxes.forEach((cb, index) => {
+            cb.removeAttribute('disabled'); 
+            cb.addEventListener('change', (e) => {
+                updateMarkdownCheckbox(memo.id, index, e.target.checked);
+            });
+        });
+
+        document.getElementById('viewer-modal').classList.add('active');
+    }
+    
+    function updateMarkdownCheckbox(memoId, targetIndex, isChecked) {
+        const memo = memos.find(m => m.id === memoId);
+        if (!memo) return;
+
+        let currentIndex = 0;
+        memo.content = memo.content.replace(/^([ \t]*[-*+][ \t]+)\[([ xX])\]/gm, (match, prefix, state) => {
+            if (currentIndex === targetIndex) {
+                currentIndex++;
+                return prefix + (isChecked ? '[x]' : '[ ]');
+            }
+            currentIndex++;
+            return match; 
+        });
+
+        memo.lastModified = Date.now();
+        saveToStorage(); 
+    }
+
+    function buildColorPicker() {
+        const container = document.getElementById('color-picker');
+        container.innerHTML = colors.map(c => `
+            <div class="color-dot ${currentEditColor === c.hex ? 'selected' : ''}" 
+                 style="background-color: ${c.hex || 'var(--md-sys-color-surface)'};"
+                 onclick="selectColor('${c.hex}')"
+                 title="${c.name}">
+            </div>
+        `).join('');
+    }
+
+    function selectColor(hex) {
+        currentEditColor = hex;
+        buildColorPicker();
+        document.getElementById('editor-content-box').style.backgroundColor = hex || 'var(--md-sys-color-surface)';
+    }
+
+    function openEditor(id) {
+        currentEditId = id;
+        const titleInput = document.getElementById('edit-title');
+        const contentInput = document.getElementById('edit-content');
+
+        if (id) {
+            const memo = memos.find(m => m.id === id);
+            titleInput.value = memo.title;
+            contentInput.value = memo.content;
+            currentEditColor = memo.color || '';
+        } else {
+            titleInput.value = '';
+            contentInput.value = '';
+            currentEditColor = '';
+        }
+        
+        buildColorPicker();
+        document.getElementById('editor-content-box').style.backgroundColor = currentEditColor || 'var(--md-sys-color-surface)';
+        document.getElementById('editor-modal').classList.add('active');
+    }
+
+    function editCurrentViewer() {
+        closeModal('viewer-modal');
+        openEditor(currentViewerId);
+    }
+
+    function saveMemo() {
+        const title = document.getElementById('edit-title').value.trim() || 'Untitled Memo';
+        const content = document.getElementById('edit-content').value;
+        const now = Date.now();
+
+        if (currentEditId) {
+            const index = memos.findIndex(m => m.id === currentEditId);
+            memos[index].title = title;
+            memos[index].content = content;
+            memos[index].color = currentEditColor;
+            memos[index].lastModified = now;
+        } else {
+            memos.unshift({ id: 'id_' + now, title, content, color: currentEditColor, lastModified: now });
+        }
+
+        saveToStorage();
+        closeModal('editor-modal');
+    }
+
+    // --- DELETION LOGIC ---
+    function deleteMemo(id) {
+        memoToDelete = id;
+        document.getElementById('delete-modal').classList.add('active');
+    }
+
+    function confirmDelete() {
+        if (memoToDelete) {
+            memos = memos.filter(m => m.id !== memoToDelete);
+            saveToStorage();
+            memoToDelete = null;
+        }
+        closeModal('delete-modal');
+    }
+
+    function handleWikiLink(targetTitle) {
+        closeModal('viewer-modal');
+        closeModal('search-modal');
+        
+        if (targetTitle.startsWith('#')) {
+            searchForTag(targetTitle);
+            return;
+        }
+
+        const existing = memos.find(m => m.title.toLowerCase() === targetTitle.toLowerCase());
+        if (existing) { openViewer(existing.id); } 
+        else {
+            const now = Date.now();
+            const newId = 'id_' + now;
+            memos.unshift({ id: newId, title: targetTitle, content: "", color: "", lastModified: now });
+            saveToStorage();
+            openEditor(newId);
+        }
+    }
+
+    // --- SEARCH ---
+    function openSearch() {
+        document.getElementById('search-input').value = '';
+        document.getElementById('search-results').innerHTML = '';
+        document.getElementById('search-modal').classList.add('active');
+        setTimeout(() => document.getElementById('search-input').focus(), 300);
+    }
+
+    function performSearch() {
+        const query = document.getElementById('search-input').value.toLowerCase().trim();
+        const resultsContainer = document.getElementById('search-results');
+        resultsContainer.innerHTML = '';
+        if (!query) return;
+
+        const results = memos.filter(m => m.title.toLowerCase().includes(query) || m.content.toLowerCase().includes(query));
+        if (results.length === 0) {
+            resultsContainer.innerHTML = '<div style="padding: 12px; color: gray;">No matches found.</div>';
+            return;
+        }
+
+        results.forEach(m => {
+            const el = document.createElement('div');
+            el.className = 'search-item';
+            el.innerHTML = '&#128196; ' + escapeHtml(m.title);
+            el.onclick = () => { closeModal('search-modal'); openViewer(m.id); };
+            resultsContainer.appendChild(el);
+        });
+    }
+
+    // --- BACKUP & SYNC ---
+    function openSettings() {
+        document.getElementById('settings-modal').classList.add('active');
+    }
+    
+    function exportData() {
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(memos));
+        const downloadAnchorNode = document.createElement('a');
+        downloadAnchorNode.setAttribute("href", dataStr);
+        downloadAnchorNode.setAttribute("download", "memos_backup.json");
+        document.body.appendChild(downloadAnchorNode);
+        downloadAnchorNode.click();
+        downloadAnchorNode.remove();
+    }
+
+    function importData(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const importedMemos = JSON.parse(e.target.result);
+                if(Array.isArray(importedMemos)) {
+                    memos = importedMemos;
+                    saveToStorage();
+                    closeModal('settings-modal');
+                    alert("Backup imported successfully!");
+                } else {
+                    alert("Invalid backup file structure.");
+                }
+            } catch (err) {
+                alert("Error reading file: " + err.message);
+            }
+        };
+        reader.readAsText(file);
+        event.target.value = ''; 
+    }
+
+    // --- UTILS ---
+    function openReorder(index) { currentReorderIndex = index; document.getElementById('reorder-modal').classList.add('active'); }
+    function moveMemo(direction) {
+        const idx = currentReorderIndex;
+        if (idx === null || memos.length < 2) return;
+        const item = memos.splice(idx, 1)[0];
+        if (direction === 0) memos.unshift(item); 
+        else if (direction === 999) memos.push(item); 
+        else {
+            let newIdx = idx + direction;
+            if (newIdx < 0) newIdx = 0;
+            if (newIdx > memos.length) newIdx = memos.length;
+            memos.splice(newIdx, 0, item);
+        }
+        saveToStorage();
+        closeModal('reorder-modal');
+    }
+    function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+    function escapeHtml(text) { return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
+
+    renderGrid();
+</script>
+</body>
+</html>
